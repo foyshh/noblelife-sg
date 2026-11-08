@@ -824,3 +824,73 @@ h1 em, h2 em, h3 em, .it, .scene figcaption em { font-family: inherit; font-styl
 
 .scene__still { animation: drift-still 14s ease-in-out infinite alternate; transform-origin: 55% 50%; }
 @keyframes drift-still { from { transform: scale(1.02) translate(0, 0); } to { transform: scale(1.12) translate(-2%, -1%); } }
+
+/* ---------- v8: fit each section in one screen, calmer footer ---------- */
+.hero6 h1 { max-width: none; }
+.h-line { white-space: nowrap; font-size: clamp(2rem, 1rem + 3vw, 4rem); }
+@media (max-width: 960px) { .h-line { white-space: normal; } }
+
+/* 01: everything inside the screen at any laptop height */
+.story__top { top: max(76px, 9svh); }
+.story__title { padding-top: 16svh; }
+.story__big { font-size: min(5.2vw, 8.6svh); }
+.story__sub { font-size: min(1.6vw, 2.8svh); }
+.story__steps { bottom: 11svh; height: auto; min-height: 4.5em; }
+.story__step span:last-child { font-size: min(1.2rem, 2.4svh); }
+.story__more { bottom: 4svh; padding: 6px 0; }
+@media (max-width: 960px) { .story__big { font-size: min(10vw, 6.4svh); } .story__sub { font-size: 4.2vw; } }
+
+/* 03: tabs, gallery and words in one screen */
+#products.sec { min-height: 100svh; padding-top: max(84px, 10svh); padding-bottom: 4svh; display: grid; align-content: center; }
+#products .rule-top { margin-bottom: 2.4svh; }
+#products h2 { margin-bottom: 1.6svh; }
+#products .ptabs { margin: 0 0 2.4svh; }
+#products .ptab { min-height: 54px; padding: 6px 14px 6px 6px; }
+#products .ptab img { width: 40px; height: 40px; }
+#products .ppanel { grid-template-columns: auto 1fr; gap: clamp(24px, 4vw, 64px); align-items: start; }
+#products .pgal { width: min(44vw, calc(100svh - 360px)); min-width: 280px; }
+#products .pgal__thumbs { grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 8px; }
+#products .pgal__thumbs button { aspect-ratio: auto; height: min(64px, 8svh); }
+#products .pinfo .meta { margin-bottom: 8px; }
+#products .pinfo__title { font-size: min(3.2vw, 5.4svh); margin-bottom: .3em; }
+#products .lead { font-size: 1.05rem; margin-bottom: 1.2svh; }
+#products .points { margin: 1.4svh 0 2svh; }
+#products .points button { padding: min(14px, 1.6svh) 0; font-size: 1.02rem; }
+#products .points .ans p { padding-bottom: 12px; font-size: .98rem; }
+@media (max-width: 960px) { #products.sec { min-height: 0; display: block; } #products .ppanel { grid-template-columns: 1fr; } #products .pgal { width: 100%; min-width: 0; } #products .pinfo__title { font-size: 2.2rem; } }
+
+/* 04: AI Healthy in one screen */
+#reminders.sec { min-height: 100svh; padding-top: max(84px, 10svh); padding-bottom: 4svh; display: grid; align-content: center; }
+#reminders .rule-top { margin-bottom: 3svh; }
+#reminders h2 { font-size: min(var(--t-h2), 7svh); }
+#reminders .lead { font-size: 1.05rem; }
+#reminders .remind__list { margin-top: 2svh; }
+#reminders .remind__list li { padding: min(14px, 1.6svh) 0; }
+#reminders .phone { width: auto; height: min(74svh, 640px); }
+@media (max-width: 960px) { #reminders.sec { min-height: 0; display: block; } #reminders .phone { height: auto; width: min(320px, 82vw); } }
+
+/* 05: smaller */
+.trust { margin-top: 32px; gap: 10px; }
+.trust__item { padding: 20px 20px 10px; }
+.trust__item .trust__big { font-size: clamp(2rem, 1.4rem + 1.6vw, 2.8rem); margin-bottom: 18px; }
+.trust__item h3 { font-size: 1.1rem; }
+.trust__item p { font-size: .95rem; }
+.voices { margin-top: 32px; }
+.voices__empty { font-size: clamp(1.1rem, 1rem + .5vw, 1.4rem); }
+
+/* footer */
+.footer { padding: 72px 0 32px; border-top: 1px solid var(--rule); background: #FAFAF7; }
+.footer__grid { grid-template-columns: 1.5fr 1fr 1fr 1fr 1.2fr; gap: 28px 40px; padding-bottom: 40px; }
+.footer__brand img { height: 30px; width: auto; margin-bottom: 14px; }
+.footer__brand p { color: var(--ink-2); max-width: 30ch; }
+.footer h2 { font: 600 .8rem/1.2 var(--sans); letter-spacing: .02em; color: var(--ink); margin-bottom: 14px; }
+.footer ul { gap: 9px; }
+.footer li { color: var(--ink-2); font-size: .95rem; }
+.footer__legal { margin-top: 0; }
+@media (max-width: 960px) { .footer__grid { grid-template-columns: 1fr 1fr; } .footer__brand { grid-column: 1 / -1; } }
+.hero6__media::before { content: ""; position: absolute; inset: 0 0 auto 0; height: 140px; z-index: 1; background: linear-gradient(rgba(248,249,245,.85), rgba(248,249,245,0)); pointer-events: none; }
+#products h2.h-line { font-size: min(clamp(2rem, 1rem + 3vw, 4rem), 6.4svh); }
+#products .ptab { min-height: 46px; }
+#products .ptab img { width: 34px; height: 34px; }
+#products .rule-top { padding-top: 12px; margin-bottom: 1.6svh; }
+#products .pinfo__title { font-size: min(3vw, 5svh); }
