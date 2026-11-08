@@ -894,3 +894,29 @@ h1 em, h2 em, h3 em, .it, .scene figcaption em { font-family: inherit; font-styl
 #products .ptab img { width: 34px; height: 34px; }
 #products .rule-top { padding-top: 12px; margin-bottom: 1.6svh; }
 #products .pinfo__title { font-size: min(3vw, 5svh); }
+
+/* ---------- v9: lighter product panels, a real-size phone ---------- */
+#products .pinfo { align-self: center; padding-top: 0; }
+#products .pinfo__title { font-size: min(4.2vw, 7svh); line-height: 1; margin-bottom: .35em; }
+.pinfo__pack { color: var(--ink-3); font-size: 1.05rem; margin: 0 0 3svh; }
+#reminders .remind { grid-template-columns: 1fr auto; align-items: center; }
+#reminders .phone { height: min(calc(100svh - 110px), 760px); width: auto; aspect-ratio: 9 / 19; padding: 9px; border-radius: 44px; }
+#reminders .phone__screen { border-radius: 36px; }
+#reminders .msg { font-size: .82rem; }
+#reminders .phone__bar { padding: 18px 14px 10px; }
+#reminders h2 { font-size: min(var(--t-h2), 6.4svh); }
+#reminders .lead { font-size: .98rem; max-width: 46ch; }
+#reminders .remind__list li { font-size: .95rem; padding: min(12px, 1.4svh) 0; }
+#reminders .rule-top { margin-bottom: 2svh; }
+#reminders.sec { padding-top: max(80px, 9svh); padding-bottom: 2svh; }
+@media (max-width: 960px) { #reminders .remind { grid-template-columns: 1fr; } #reminders .phone { height: auto; width: min(340px, 86vw); justify-self: center; } }
+#products .pgal { width: min(54vw, calc((100svh - 360px) * 1.4)); }
+#products .pgal__main { aspect-ratio: 1.4; }
+@media (max-width: 960px) { #products .pgal { width: 100%; } #products .pgal__main { aspect-ratio: 1; } }
+@media (min-width: 961px) {
+  #reminders .wrap { display: grid; grid-template-columns: 1fr auto; column-gap: clamp(32px, 6vw, 110px); align-items: center; }
+  #reminders .remind { display: contents; }
+  #reminders .rule-top { grid-column: 1; grid-row: 1; align-self: start; }
+  #reminders .remind > div:first-child { grid-column: 1; grid-row: 2; align-self: start; }
+  #reminders .phone { grid-column: 2; grid-row: 1 / span 2; height: min(calc(100svh - 104px), 760px); }
+}
