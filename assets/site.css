@@ -920,3 +920,13 @@ h1 em, h2 em, h3 em, .it, .scene figcaption em { font-family: inherit; font-styl
   #reminders .remind > div:first-child { grid-column: 1; grid-row: 2; align-self: start; }
   #reminders .phone { grid-column: 2; grid-row: 1 / span 2; height: min(calc(100svh - 104px), 760px); }
 }
+
+/* ---------- v10: bigger media, thumbnails on top of it ---------- */
+#products .pgal { position: relative; width: min(62vw, calc((100svh - 270px) * 1.4)); }
+#products .pgal__thumbs { position: absolute; right: 12px; bottom: 12px; z-index: 3; margin: 0; grid-template-columns: repeat(4, min(58px, 8svh)); gap: 6px; }
+#products .pgal__thumbs button { height: min(58px, 8svh); border-radius: 8px; opacity: .8; box-shadow: 0 0 0 2px rgba(255,255,255,.85); }
+#products .pgal__thumbs button[aria-pressed="true"] { opacity: 1; box-shadow: 0 0 0 2px #fff, 0 0 0 4px var(--ink); }
+#products .pgal__how { font-size: .62rem !important; line-height: 1.1; }
+#products .scene { grid-template-rows: 1fr; }
+#products .obj3d { inset: 0; }
+@media (max-width: 960px) { #products .pgal { width: 100%; } #products .pgal__thumbs { grid-template-columns: repeat(4, 48px); } #products .pgal__thumbs button { height: 48px; } }
