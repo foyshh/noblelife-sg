@@ -414,7 +414,7 @@
           vec2 q = uv - uC; q.x *= uA;
           float water = smoothstep(.12, .3, uP) * (1.0 - smoothstep(.5, .66, uP));
           float studio = smoothstep(.55, .75, uP);
-          vec3 pool = mix(vec3(.10,.30,.19), vec3(.08,.27,.25), water); pool = mix(pool, vec3(.13,.31,.22), studio);
+          vec3 pool = mix(vec3(.10,.30,.19), vec3(.08,.27,.25), water); pool = mix(pool, vec3(.24,.36,.19), studio);
           c += pool * exp(-dot(q,q) * 2.6) * (.62 + .08 * sin(uT * .6));
           float a = uv.x * 5.0 - uv.y * 1.3;
           float rays = (sin(a + uT * .22) * .5 + .5) * (sin(a * 2.7 - uT * .15 + 1.3) * .5 + .5);
@@ -455,7 +455,7 @@
     const V = (x, y) => new THREE.Vector2(x, y);
     const glassG = new THREE.Group(); glassG.position.set(1.8, 0, 0); group.add(glassG);
     const glassMat = new THREE.MeshPhysicalMaterial({ color: 0xf2fbff, metalness: 0, roughness: .02, transmission: 1, transparent: true, envMapIntensity: 2.6, clearcoat: 1, clearcoatRoughness: .02, side: THREE.DoubleSide });
-    const waterMat = new THREE.MeshPhysicalMaterial({ color: 0x9fd2e6, metalness: 0, roughness: .06, transmission: .55, transparent: true, envMapIntensity: 1.5 });
+    const waterMat = new THREE.MeshPhysicalMaterial({ color: 0x8fd0c4, metalness: 0, roughness: .04, transmission: .92, transparent: true, envMapIntensity: 1.1 });
     glassG.add(new THREE.Mesh(new THREE.LatheGeometry([V(0, -2.62), V(1.1, -2.62), V(1.19, -2.56), V(1.5, 1.95), V(1.43, 1.97), V(1.13, -2.28), V(0, -2.28)], 72), glassMat));
     const waterMesh = new THREE.Mesh(new THREE.LatheGeometry([V(0, -2.27), V(1.12, -2.27), V(1.355, .95), V(0, .95)], 72), waterMat);
     glassG.add(waterMesh);
@@ -467,10 +467,31 @@
       const b = new THREE.Mesh(new THREE.SphereGeometry(.025 + R() * .045, 12, 10), bubMat);
       b.userData = { a: R() * 6.283, r: .1 + R() * .9, s: .25 + R() * .35, o: R() }; glassG.add(b); return b;
     });
+    // water pours in as you scroll: a thin stream, a rising level
+    const streamMat = new THREE.MeshPhysicalMaterial({ color: 0xd6f1ea, roughness: .03, transmission: .7, transparent: true, envMapIntensity: 2.4 });
+    const stream = new THREE.Mesh(new THREE.CylinderGeometry(.075, .05, 1, 16), streamMat); stream.position.x = .12; glassG.add(stream);
+    const warm = new THREE.PointLight(0xffe0ad, 0, 16); warm.position.set(-3, 3.5, 5); group.add(warm);
+    // a soft floor under the glass and tablets: pooled light, a bright refraction, contact shadows
+    const fc = document.createElement("canvas"); fc.width = fc.height = 512;
+    const fx = fc.getContext("2d"), U = 512 / 11, blob = (x, z, rx, rz, c0, c1) => {
+      const cx = 256 + x * U, cy = 256 + z * U; fx.save(); fx.translate(cx, cy); fx.scale(1, rz / rx);
+      const g = fx.createRadialGradient(0, 0, 0, 0, 0, rx * U); g.addColorStop(0, c0); g.addColorStop(1, c1);
+      fx.fillStyle = g; fx.beginPath(); fx.arc(0, 0, rx * U, 0, 6.283); fx.fill(); fx.restore(); };
+    blob(.3, 0, 5.2, 5.2, "rgba(190,232,150,.20)", "rgba(190,232,150,0)");
+    blob(2.9, .9, 1.7, 1.1, "rgba(240,255,215,.42)", "rgba(240,255,215,0)");
+    blob(1.8, .1, 1.7, 1.5, "rgba(4,22,12,.62)", "rgba(4,22,12,0)");
+    blob(-1.35, .5, 1.5, 1.1, "rgba(4,22,12,.6)", "rgba(4,22,12,0)");
+    const floorMat = new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(fc), transparent: true, opacity: 0, depthWrite: false });
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(11, 11), floorMat); floor.rotation.x = -Math.PI / 2; floor.position.y = -2.635; floor.visible = false; group.add(floor);
     glassG.visible = false;
     // the real tablet the particles turn into
     const realTab = tabletMesh(); realTab.material.transparent = true; realTab.material.opacity = 0; realTab.visible = false;
     group.add(realTab);
+    // two more tablets drop in beside it
+    const REST = [[-.9, -2.51, .25, 0, .4, 0], [-1.95, -2.51, .05, 0, 1.3, 0], [-1.4, -2.1, 1.05, Math.PI / 2 - .5, 0, .35]];
+    const extra = [1, 2].map(() => { const e = realTab.clone(); e.visible = false; group.add(e); return e; });
+    const bounce = (x) => { const n = 7.5625, d = 2.75; return x < 1 / d ? n * x * x : x < 2 / d ? n * (x -= 1.5 / d) * x + .75 : x < 2.5 / d ? n * (x -= 2.25 / d) * x + .9375 : n * (x -= 2.625 / d) * x + .984375; };
+    const TS = .36;
 
     // four shapes the particles move between
     const S = [0, 1, 2, 3].map(() => new Float32Array(N * 3)), C = [0, 1, 2, 3].map(() => new Float32Array(N * 3));
@@ -526,8 +547,8 @@
       const w = host.clientWidth, h = host.clientHeight; if (!w || !h) return;
       renderer.setPixelRatio(1); renderer.setSize(Math.round(w * PR), Math.round(h * PR), false); camera.aspect = w / h; camera.updateProjectionMatrix();
       wide = w >= 960;
-      group.position.x = wide ? 3.7 : 0; group.position.y = wide ? -.2 : -2.1;
-      bgMat.uniforms.uA.value = w / h; bgMat.uniforms.uC.value.set(wide ? .71 : .5, wide ? .5 : .34);
+      group.position.x = wide ? 3.7 : 0; group.position.y = wide ? .25 : -1.25;
+      bgMat.uniforms.uA.value = w / h; bgMat.uniforms.uC.value.set(wide ? .71 : .5, wide ? .53 : .42);
     };
     size(); addEventListener("resize", size);
     if ("ResizeObserver" in window) new ResizeObserver(size).observe(host);
@@ -547,9 +568,21 @@
       // the cells press into a tablet, then a real tablet takes over from the particles
       const wt = sm(cl01((p - 1.55) / .4)), mv = sm(cl01((p - 2) / .75));
       realTab.visible = wt > .01; realTab.material.opacity = wt; realTab.material.transparent = wt < .99; realTab.material.depthWrite = wt >= .99;
-      realTab.scale.setScalar((1.84 + (.8 - 1.84) * mv) * (.94 + .06 * wt));
-      realTab.position.set(-2.7 * mv, -1.6 * mv, 0);
-      realTab.rotation.set(Math.PI / 2 - .55 * mv, 0, t * .15 * (1 - mv));
+      realTab.scale.setScalar((1.84 + (TS - 1.84) * mv) * (.94 + .06 * wt));
+      realTab.position.set(REST[0][0] * mv, REST[0][1] * mv, REST[0][2] * mv);
+      realTab.rotation.set((Math.PI / 2) * (1 - mv), REST[0][4] * mv, t * .15 * (1 - mv));
+      extra.forEach((e, k) => {
+        const r = REST[k + 1], d = cl01((prog - (.8 + k * .05)) / .1);
+        e.visible = d > 0; e.scale.setScalar(TS);
+        e.position.set(r[0], r[1] + (1 - bounce(d)) * 7, r[2]); e.rotation.set(r[3] + (1 - d) * 1.4, r[4], r[5] + (1 - d) * 2);
+      });
+      // the pour: the level rises from a splash to nearly full
+      const pour = cl01((prog - .79) / .15), lv = .16 + .84 * sm(pour), topY = -2.27 + 3.22 * lv, rTop = 1.12 + .235 * lv;
+      const wxz = rTop / 1.355; waterMesh.scale.set(wxz, lv, wxz); waterMesh.position.y = -2.27 * (1 - lv);
+      const pouring = sm(cl01(pour / .1)) * (1 - sm(cl01((pour - .88) / .12)));
+      surf.position.y = topY; surf.scale.setScalar(rTop / 1.35 * (.985 + .012 * Math.sin(t * 9) * pouring)); surf.rotation.z = t * .6;
+      stream.visible = pouring > .01; streamMat.opacity = pouring * .9;
+      stream.scale.set(1 + .15 * Math.sin(t * 14), 7.2 - topY, 1 + .15 * Math.cos(t * 11)); stream.position.y = topY + (7.2 - topY) / 2;
       const gather = 1 - sm(cl01(intro)), dirS = a === 1 ? -1 : 1;
       for (let i = 0; i < N; i++) {
         const j = i * 3, k = sm(cl01((f - del[i]) / .6));
@@ -571,7 +604,7 @@
         }
         pos[j] = x + Math.sin(t * .7 + i) * .04; pos[j + 1] = y + Math.cos(t * .6 + i * .7) * .04; pos[j + 2] = z;
         col[j] = CA[j] + (CB[j] - CA[j]) * k; col[j + 1] = CA[j + 1] + (CB[j + 1] - CA[j + 1]) * k; col[j + 2] = CA[j + 2] + (CB[j + 2] - CA[j + 2]) * k;
-        if (a === 2 && inGlass(i)) { sz[i] = scl[i] * .14 * k; pos[j + 1] += k * (((t * .2 + del[i] * 9) % 1) * 2.6 - 1.3) * .6; }
+        if (a === 2 && inGlass(i)) { pos[j + 1] += k * (((t * .2 + del[i] * 9) % 1) * 2.6 - 1.3) * .6; sz[i] = pos[j + 1] < topY - .1 ? scl[i] * .14 * k : 0; }
         else if (a === 2) sz[i] = 0;
         else if (a === 1) sz[i] = scl[i] * (1 - wt);
         else sz[i] = scl[i] * (1 - gather * .5);
@@ -579,16 +612,17 @@
       geo.attributes.position.needsUpdate = true; geo.attributes.color.needsUpdate = true; geo.attributes.aScale.needsUpdate = true;
       // the real glass fades in as the particles settle into it
       const wg = sm(cl01((p - 2.05) / .6));
-      glassG.visible = wg > .01; glassMat.opacity = wg; waterMat.opacity = wg * .92; surfMat.opacity = wg * .9; bubMat.opacity = wg;
+      glassG.visible = wg > .01; glassMat.opacity = wg; waterMat.opacity = wg * .5; surfMat.opacity = wg * .55; bubMat.opacity = wg;
+      floor.visible = wg > .01; floorMat.opacity = wg; warm.intensity = wg * 1.1;
       glassG.scale.setScalar(.92 + .08 * wg);
       waterMesh.rotation.y = t * .2;
-      bubs.forEach((b) => { const u = b.userData, y = ((t * u.s * .25 + u.o) % 1); b.position.set(Math.cos(u.a + t * .3) * u.r, -2.1 + y * 2.95, Math.sin(u.a + t * .3) * u.r); });
+      bubs.forEach((b) => { const u = b.userData, y = ((t * u.s * (.25 + pouring * .9) + u.o) % 1); b.position.set(Math.cos(u.a + t * .3) * u.r * wxz, -2.15 + y * (topY + 2.05), Math.sin(u.a + t * .3) * u.r * wxz); });
       // a slow turn for the cells, a tilt that shows the tablet's edge, then a steady view of the glass
       const tab = Math.max(0, 1 - Math.abs(prog - .62) / .16), end = cl01((prog - .74) / .1);
-      group.rotation.x = (.22 + cmy * .2) * (1 - tab) + (-.72 + cmy * .15) * tab;
+      group.rotation.x = (.22 + .12 * end + cmy * .2) * (1 - tab) + (-.72 + cmy * .15) * tab;
       const base = (t * .12 + prog * 1.4 + cmx * .35) % 6.283;
       group.rotation.y = (base * (1 - tab) + (.4 + cmx * .3 + Math.sin(t * .4) * .25) * tab) * (1 - end) + (cmx * .3 + Math.sin(t * .5) * .12) * end;
-      const gs = (wide ? 1 : Math.min(.62, camera.aspect * .98)) * (.82 + .18 * (1 - gather));
+      const gs = (wide ? 1 : Math.min(.56, camera.aspect * .9)) * (.82 + .18 * (1 - gather));
       group.scale.setScalar(gs);
       // the camera drifts in slowly and leans a little with the pointer
       camera.position.set(cmx * .7, -cmy * .45, 17.8 - prog * 1.3); camera.lookAt(0, 0, 0);
@@ -609,9 +643,10 @@
     }
   }
 
-  const wheel = $(".wheel");
+  const wheel = $(".wheel"), gal = $(".gal");
   const flat = () => {
     if (wheel) wheel.classList.add("wheel--flat");
+    if (gal) gal.classList.add("gal--flat");
     if (story) story.classList.add("story--flat");
     const tl0 = $(".tl"); if (tl0) tl0.classList.add("tl--flat");
     $$(".statement .w").forEach((w) => w.classList.add("on"));
@@ -745,6 +780,24 @@
   $$(".promises, .steps, .remind__list, .points, .shopgrid, .forms, .trust").forEach((g) => {
     gsap.from(g.children, { y: 40, opacity: 0, duration: .9, stagger: .1, ease: "power3.out", scrollTrigger: { trigger: g, start: "top 86%" } });
   });
+
+  // ----- 02 / the range: a straight gallery that slides past as you scroll (laptops only) -----
+  if (gal) {
+    mm.add("(min-width: 961px)", () => {
+      const row = $(".gal__row", gal), cards = $$(".gal__card", gal), count = $(".gal__count b", gal), line = $(".gal__line i", gal);
+      const tw = gsap.to(row, { x: () => -Math.max(0, row.scrollWidth - innerWidth), ease: "none",
+        scrollTrigger: { trigger: $(".gal__track", gal), start: "top top", end: "bottom bottom", scrub: .7, invalidateOnRefresh: true,
+          onUpdate: (s) => {
+            count.textContent = "0" + (Math.min(cards.length - 1, Math.round(s.progress * (cards.length - 1))) + 1);
+            line.style.transform = `scaleX(${.25 + .75 * s.progress})`;
+          } } });
+      // each photo drifts a little inside its frame as it crosses the screen
+      const par = $$(".gal__img img", gal).map((im) => gsap.fromTo(im, { xPercent: -4 }, { xPercent: 4, ease: "none",
+        scrollTrigger: { trigger: im.parentElement, containerAnimation: tw, start: "left right", end: "right left", scrub: true } }));
+      const rev = gsap.from(cards, { y: 90, opacity: 0, duration: 1.1, stagger: .1, ease: "power3.out", scrollTrigger: { trigger: gal, start: "top 60%" } });
+      return () => { par.forEach((p) => p.kill()); rev.kill(); tw.kill(); };
+    });
+  }
 
   // ----- product wheel: the dome turns as you scroll, two laps so it is never empty -----
   if (wheel) {
