@@ -11,9 +11,10 @@
 
   // ----- header -----
   const header = $(".header, .lp-head");
-  let lastY = 0;
+  let lastY = 0, scrollDir = 1;
   const onScroll = () => {
     const y = window.scrollY;
+    if (y !== lastY) scrollDir = y > lastY ? 1 : -1;
     if (header) {
       header.classList.toggle("is-solid", y > 20);
       if (window.innerWidth >= 960) header.classList.toggle("is-hidden", y > lastY && y > 500 && !document.body.classList.contains("cart-open"));
@@ -393,14 +394,51 @@
     let renderer;
     try { renderer = new THREE.WebGLRenderer({ antialias: true }); } catch (e) { return null; }
     if (!renderer.getContext()) return null;
-    const mobile = innerWidth < 960, N = mobile ? 3600 : 7600;
-    renderer.setPixelRatio(Math.min(devicePixelRatio || 1, 2));
+    const mobile = innerWidth < 960, N = mobile ? 4200 : 9000;
+    const PR = Math.min(devicePixelRatio || 1, 2);
     host.appendChild(renderer.domElement);
     const scene = new THREE.Scene(), camera = new THREE.PerspectiveCamera(34, 1, .1, 100);
-    scene.background = new THREE.Color(0x133624);
     renderer.toneMapping = THREE.ACESFilmicToneMapping; renderer.outputEncoding = THREE.sRGBEncoding;
     camera.position.set(0, 0, 17);
     const group = new THREE.Group(); scene.add(group);
+    const rnd = (a, b) => a + R() * (b - a);
+
+    // backdrop: deep water with a pool of light behind the subject and slow shafts from above
+    const bgMat = new THREE.ShaderMaterial({ depthTest: false, depthWrite: false,
+      uniforms: { uT: { value: 0 }, uP: { value: 0 }, uA: { value: 1 }, uC: { value: new THREE.Vector2(.7, .5) } },
+      vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
+      fragmentShader: `varying vec2 vUv; uniform float uT; uniform float uP; uniform float uA; uniform vec2 uC;
+        float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453); }
+        void main(){ vec2 uv = vUv;
+          vec3 c = mix(vec3(.035,.115,.075), vec3(.06,.185,.12), smoothstep(0.0, 1.0, uv.y));
+          vec2 q = uv - uC; q.x *= uA;
+          float water = smoothstep(.12, .3, uP) * (1.0 - smoothstep(.5, .66, uP));
+          float studio = smoothstep(.55, .75, uP);
+          vec3 pool = mix(vec3(.10,.30,.19), vec3(.08,.27,.25), water); pool = mix(pool, vec3(.13,.31,.22), studio);
+          c += pool * exp(-dot(q,q) * 2.6) * (.62 + .08 * sin(uT * .6));
+          float a = uv.x * 5.0 - uv.y * 1.3;
+          float rays = (sin(a + uT * .22) * .5 + .5) * (sin(a * 2.7 - uT * .15 + 1.3) * .5 + .5);
+          c += vec3(.07,.2,.15) * pow(rays, 2.2) * smoothstep(0.0, 1.0, uv.y) * (.22 + .78 * water) * mix(.3, 1.0, smoothstep(.25, .7, uv.x));
+          c *= mix(.6, 1.0, smoothstep(1.15, .3, length((uv - .5) * vec2(1.2, 1.0))));
+          c += (hash(uv * 900.0 + fract(uT)) - .5) * .014;
+          gl_FragColor = vec4(c, 1.0); }` });
+    const bg = new THREE.Mesh(new THREE.PlaneGeometry(2, 2), bgMat); bg.frustumCulled = false; bg.renderOrder = -10; scene.add(bg);
+
+    // soft out-of-focus specks drifting up, for depth
+    const DN = mobile ? 60 : 140, dpos = new Float32Array(DN * 3), dsz = new Float32Array(DN), dsp = new Float32Array(DN);
+    for (let i = 0; i < DN; i++) { dpos.set([rnd(-14, 14), rnd(-8, 8), rnd(-11, 5)], i * 3); dsz[i] = rnd(.7, 3.6); dsp[i] = rnd(.05, .28); }
+    const dgeo = new THREE.BufferGeometry();
+    dgeo.setAttribute("position", new THREE.BufferAttribute(dpos, 3));
+    dgeo.setAttribute("aS", new THREE.BufferAttribute(dsz, 1)); dgeo.setAttribute("aSp", new THREE.BufferAttribute(dsp, 1));
+    const dustMat = new THREE.ShaderMaterial({ transparent: true, depthWrite: false, blending: THREE.AdditiveBlending,
+      uniforms: { uT: { value: 0 }, uPR: { value: PR } },
+      vertexShader: `attribute float aS; attribute float aSp; uniform float uT; uniform float uPR; varying float vA;
+        void main(){ vec3 p = position; p.y = mod(p.y + uT * aSp + 8.0, 16.0) - 8.0; p.x += sin(uT * .3 + position.z) * .35;
+        vec4 mv = modelViewMatrix * vec4(p, 1.0); gl_PointSize = aS * uPR * 62.0 / -mv.z;
+        vA = smoothstep(8.0, 6.0, abs(p.y)) * (.5 + .5 * sin(uT * aSp * 3.0 + position.x)); gl_Position = projectionMatrix * mv; }`,
+      fragmentShader: `varying float vA; void main(){ float d = length(gl_PointCoord - .5) * 2.0;
+        gl_FragColor = vec4(vec3(.62,.92,.6), smoothstep(1.0, .15, d) * .11 * vA); }` });
+    const dust = new THREE.Points(dgeo, dustMat); dust.frustumCulled = false; scene.add(dust);
 
     // a soft studio around the scene, so the glass has something real to reflect
     const pmrem = new THREE.PMREMGenerator(renderer), envS = new THREE.Scene();
@@ -436,11 +474,11 @@
 
     // four shapes the particles move between
     const S = [0, 1, 2, 3].map(() => new Float32Array(N * 3)), C = [0, 1, 2, 3].map(() => new Float32Array(N * 3));
-    const rnd = (a, b) => a + R() * (b - a);
     const sph = () => { const u = R() * 2 - 1, t = R() * 6.283, s = Math.sqrt(1 - u * u); return [s * Math.cos(t), u, s * Math.sin(t)]; };
     const GREENS = [[.47, .76, .36], [.29, .6, .26], [.62, .86, .46], [.2, .46, .2]], BLUE = [.66, .86, .94], GLASS = [.86, .94, .96];
     const put = (k, i, p, c, j = .05) => { S[k].set(p, i * 3); C[k].set([c[0] + rnd(-j, j), c[1] + rnd(-j, j), c[2] + rnd(-j, j)], i * 3); };
-    const cells = Array.from({ length: mobile ? 46 : 80 }, () => ({ c: [rnd(-4.6, 5.6), rnd(-3.8, 3.8), rnd(-3, 3)], r: rnd(.22, .6) }));
+    const CL = mobile ? 40 : 72;
+    const cells = Array.from({ length: CL }, () => ({ c: [mobile ? rnd(-4, 4) : rnd(-3, 5.4), rnd(-3.6, 3.6), rnd(-3, 3)], r: rnd(.24, .66) }));
     const water = new Uint8Array(N);
     for (let i = 0; i < N; i++) {
       const g = GREENS[i % 4], f = i / N;
@@ -448,9 +486,9 @@
       if (f < .72) { const d = sph(), r = rnd(2.75, 2.95); put(0, i, [d[0] * r, d[1] * r, d[2] * r], g); }
       else { const d = sph(), r = rnd(1.2, 2.2); put(0, i, [d[0] * r, d[1] * r - .3, d[2] * r], [.18, .42, .17]); }
       // 1: many small cells in fresh water, plus bubbles
-      water[i] = R() < .16 ? 1 : 0;
-      if (water[i]) put(1, i, [rnd(-5, 6), rnd(-4.2, 4.2), rnd(-3, 3)], BLUE, .03);
-      else { const cl = cells[i % cells.length], d = sph(); put(1, i, [cl.c[0] + d[0] * cl.r, cl.c[1] + d[1] * cl.r, cl.c[2] + d[2] * cl.r], g); }
+      water[i] = R() < .14 ? 1 : 0;
+      if (water[i]) put(1, i, [mobile ? rnd(-4.4, 4.4) : rnd(-3.4, 5.8), rnd(-4, 4), rnd(-3, 3)], BLUE, .03);
+      else { const cl = cells[i % CL], d = sph(); put(1, i, [cl.c[0] + d[0] * cl.r, cl.c[1] + d[1] * cl.r, cl.c[2] + d[2] * cl.r], g); }
       // 2: pressed into one tablet (faces and rounded rim)
       { const a = R() * 6.283, face = R() < .68;
         if (face) { const r = 3 * Math.sqrt(R()), z = (R() < .5 ? -.55 : .55) * (1 - Math.pow(r / 3, 6) * .35); put(2, i, [Math.cos(a) * r, Math.sin(a) * r, z], g); }
@@ -459,79 +497,106 @@
       if (f < .3) { const a = R() * 6.283, r = 1.25 * Math.sqrt(R()); put(3, i, [-2.7 + Math.cos(a) * r, -1.6 + Math.sin(a) * r * .45, (R() < .5 ? -.25 : .25) + rnd(-.05, .05)], g); }
       else { const a = R() * 6.283, y = rnd(-2.1, .8), r = (1.02 + (y + 2.3) / 3.3 * .22) * Math.sqrt(R()); put(3, i, [1.8 + Math.cos(a) * r, y, Math.sin(a) * r], GLASS, .02); }
     }
-    const pos = new Float32Array(N * 3), col = new Float32Array(N * 3), scl = new Float32Array(N), sz = new Float32Array(N), del = new Float32Array(N);
-    for (let i = 0; i < N; i++) { scl[i] = rnd(.7, 1.3) * (water[i] ? .8 : 1); del[i] = R() * .4; }
+    const pos = new Float32Array(N * 3), col = new Float32Array(N * 3), scl = new Float32Array(N), sz = new Float32Array(N), del = new Float32Array(N), jit = new Float32Array(N), jit2 = new Float32Array(N);
+    for (let i = 0; i < N; i++) { scl[i] = rnd(.7, 1.3) * (water[i] ? .8 : 1); del[i] = R() * .4; jit[i] = R(); jit2[i] = R() * 2 - 1; }
     sz.set(scl); const inGlass = (i) => i / N >= .3;
     pos.set(S[0]); col.set(C[0]);
     const geo = new THREE.BufferGeometry();
     geo.setAttribute("position", new THREE.BufferAttribute(pos, 3));
     geo.setAttribute("color", new THREE.BufferAttribute(col, 3));
     geo.setAttribute("aScale", new THREE.BufferAttribute(sz, 1));
+    // each particle is shaded as a small wet bead: key light, a soft rim and a highlight
     const mat = new THREE.ShaderMaterial({
-      uniforms: { uSize: { value: mobile ? 8.5 : 7.5 }, uPR: { value: Math.min(devicePixelRatio || 1, 2) } },
+      uniforms: { uSize: { value: mobile ? 8.2 : 7.6 }, uPR: { value: PR } },
       vertexColors: true, transparent: false, depthWrite: true,
       vertexShader: `attribute float aScale; varying vec3 vC; varying float vD; uniform float uSize; uniform float uPR;
         void main(){ vC = color; vec4 mv = modelViewMatrix * vec4(position,1.0); vD = clamp((-mv.z - 12.0) / 10.0, 0.0, 1.0);
         gl_PointSize = uSize * aScale * uPR * (12.0 / -mv.z); gl_Position = projectionMatrix * mv; }`,
       fragmentShader: `varying vec3 vC; varying float vD;
         void main(){ vec2 p = gl_PointCoord * 2.0 - 1.0; float d = dot(p,p); if (d > 1.0) discard;
-        vec3 n = vec3(p.x, -p.y, sqrt(1.0 - d)); float l = max(dot(n, normalize(vec3(-.45,.6,.75))), 0.0);
-        float spec = pow(max(dot(reflect(-normalize(vec3(-.45,.6,.75)), n), vec3(0,0,1)), 0.0), 18.0);
-        vec3 c = vC * (.38 + .8 * l) + spec * .35; c = mix(c, vec3(.075,.21,.14), vD * .55); gl_FragColor = vec4(c, 1.0); }`,
+        vec3 n = vec3(p.x, -p.y, sqrt(1.0 - d)); vec3 L = normalize(vec3(-.45,.6,.75)); float l = max(dot(n, L), 0.0);
+        float spec = pow(max(dot(reflect(-L, n), vec3(0,0,1)), 0.0), 22.0); float rim = pow(1.0 - n.z, 2.4);
+        vec3 c = vC * (.34 + .82 * l) + spec * .4 + vec3(.5,.85,.45) * rim * .22 * vC.g;
+        c = mix(c, vec3(.05,.16,.105), vD * .6); gl_FragColor = vec4(c, 1.0); }`,
     });
-    group.add(new THREE.Points(geo, mat));
+    const points = new THREE.Points(geo, mat); points.frustumCulled = false; group.add(points);
 
-    const PR = Math.min(devicePixelRatio || 1, 2);
-    renderer.setPixelRatio(1);
+    let wide = true;
     const size = () => {
       const w = host.clientWidth, h = host.clientHeight; if (!w || !h) return;
-      renderer.setSize(Math.round(w * PR), Math.round(h * PR), false); camera.aspect = w / h; camera.updateProjectionMatrix();
-      group.position.x = w >= 960 ? 3.6 : 0; group.position.y = w >= 960 ? -.3 : .35;
-      const s = w >= 960 ? 1 : Math.min(.85, (w / h) / .9 * .95); group.scale.set(s, s, s);
+      renderer.setPixelRatio(1); renderer.setSize(Math.round(w * PR), Math.round(h * PR), false); camera.aspect = w / h; camera.updateProjectionMatrix();
+      wide = w >= 960;
+      group.position.x = wide ? 3.7 : 0; group.position.y = wide ? -.2 : -2.1;
+      bgMat.uniforms.uA.value = w / h; bgMat.uniforms.uC.value.set(wide ? .71 : .5, wide ? .5 : .34);
     };
     size(); addEventListener("resize", size);
     if ("ResizeObserver" in window) new ResizeObserver(size).observe(host);
-    let prog = 0, mx = 0, my = 0, visible = false, t0 = performance.now();
+    let target = 0, prog = 0, intro = host.getBoundingClientRect().top <= 0 ? 1 : 0, introT = intro, mx = 0, my = 0, cmx = 0, cmy = 0, visible = false, t0 = performance.now(), last = t0;
     addEventListener("pointermove", (e) => { mx = e.clientX / innerWidth - .5; my = e.clientY / innerHeight - .5; }, { passive: true });
     if ("IntersectionObserver" in window) new IntersectionObserver(([e]) => { visible = e.isIntersecting; }).observe(host);
-    const sm = (x) => x * x * (3 - 2 * x);
+    const sm = (x) => x * x * (3 - 2 * x), cl01 = (x) => Math.min(1, Math.max(0, x));
     const frame = (now) => {
       requestAnimationFrame(frame);
-      if (!visible) return;
+      if (!visible) { last = now; return; }
+      const dt = Math.min(.1, (now - last) / 1000); last = now;
+      // ease towards the scroll position, so the scene glides instead of jumping
+      const ez = 1 - Math.exp(-dt * 7);
+      prog += (target - prog) * ez; intro += (introT - intro) * ez; cmx += (mx - cmx) * ez * .6; cmy += (my - cmy) * ez * .6;
       const t = (now - t0) / 1000, p = Math.min(Math.max(prog * 4 - .5, 0), 2.9999), a = Math.floor(p), f = p - a, A = S[a], B = S[a + 1], CA = C[a], CB = C[a + 1];
+      bgMat.uniforms.uT.value = t; bgMat.uniforms.uP.value = prog; dustMat.uniforms.uT.value = t;
       // the cells press into a tablet, then a real tablet takes over from the particles
-      const wt = sm(Math.min(1, Math.max(0, (p - 1.55) / .4))), mv = sm(Math.min(1, Math.max(0, (p - 2) / .75)));
+      const wt = sm(cl01((p - 1.55) / .4)), mv = sm(cl01((p - 2) / .75));
       realTab.visible = wt > .01; realTab.material.opacity = wt; realTab.material.transparent = wt < .99; realTab.material.depthWrite = wt >= .99;
       realTab.scale.setScalar((1.84 + (.8 - 1.84) * mv) * (.94 + .06 * wt));
       realTab.position.set(-2.7 * mv, -1.6 * mv, 0);
       realTab.rotation.set(Math.PI / 2 - .55 * mv, 0, t * .15 * (1 - mv));
+      const gather = 1 - sm(cl01(intro)), dirS = a === 1 ? -1 : 1;
       for (let i = 0; i < N; i++) {
-        const k = sm(Math.min(1, Math.max(0, (f - del[i]) / .6))), j = i * 3, w = Math.sin(t * .7 + i) * .045;
-        pos[j] = A[j] + (B[j] - A[j]) * k + w; pos[j + 1] = A[j + 1] + (B[j + 1] - A[j + 1]) * k + Math.cos(t * .6 + i * .7) * .045 + (a === 1 && water[i] ? ((t * .35 + i * .13) % 1) * .6 * (1 - k) : 0);
-        pos[j + 2] = A[j + 2] + (B[j + 2] - A[j + 2]) * k;
+        const j = i * 3, k = sm(cl01((f - del[i]) / .6));
+        let x = A[j] + (B[j] - A[j]) * k, y = A[j + 1] + (B[j + 1] - A[j + 1]) * k, z = A[j + 2] + (B[j + 2] - A[j + 2]) * k;
+        // between shapes the particles lift, spread and swirl before they settle
+        if (k > .002 && k < .998) {
+          const s = Math.sin(k * 3.1416), th = s * (1.0 + jit[i] * .9) * dirS, cs = Math.cos(th), sn = Math.sin(th), e = 1 + s * (.22 + .2 * jit[i]);
+          const x2 = (x * cs - z * sn) * e; z = (x * sn + z * cs) * e; x = x2; y = y * e + s * jit2[i] * .9;
+        }
+        if (a === 0) {
+          // the single cell breathes; on arrival its particles gather from a loose cloud
+          const br = 1 + (.028 * Math.sin(t * 1.3 + A[j + 1] * 1.8) * (1 - k)) + gather * (.5 + jit[i] * 2.4);
+          x *= br; y *= br; z *= br;
+        }
+        const w1 = a === 0 ? k : a === 1 ? 1 - k : 0;
+        if (w1 > 0) {
+          if (water[i]) y += w1 * Math.sin(t * .5 + i) * .32;
+          else { const ci = i % CL; y += w1 * Math.sin(t * .6 + ci * 1.7) * .16; x += w1 * Math.cos(t * .45 + ci * 2.3) * .12; }
+        }
+        pos[j] = x + Math.sin(t * .7 + i) * .04; pos[j + 1] = y + Math.cos(t * .6 + i * .7) * .04; pos[j + 2] = z;
         col[j] = CA[j] + (CB[j] - CA[j]) * k; col[j + 1] = CA[j + 1] + (CB[j + 1] - CA[j + 1]) * k; col[j + 2] = CA[j + 2] + (CB[j + 2] - CA[j + 2]) * k;
         if (a === 2 && inGlass(i)) { sz[i] = scl[i] * .14 * k; pos[j + 1] += k * (((t * .2 + del[i] * 9) % 1) * 2.6 - 1.3) * .6; }
         else if (a === 2) sz[i] = 0;
         else if (a === 1) sz[i] = scl[i] * (1 - wt);
-        else sz[i] = scl[i];
+        else sz[i] = scl[i] * (1 - gather * .5);
       }
       geo.attributes.position.needsUpdate = true; geo.attributes.color.needsUpdate = true; geo.attributes.aScale.needsUpdate = true;
       // the real glass fades in as the particles settle into it
-      const wg = sm(Math.min(1, Math.max(0, (p - 2.05) / .6)));
+      const wg = sm(cl01((p - 2.05) / .6));
       glassG.visible = wg > .01; glassMat.opacity = wg; waterMat.opacity = wg * .92; surfMat.opacity = wg * .9; bubMat.opacity = wg;
       glassG.scale.setScalar(.92 + .08 * wg);
       waterMesh.rotation.y = t * .2;
       bubs.forEach((b) => { const u = b.userData, y = ((t * u.s * .25 + u.o) % 1); b.position.set(Math.cos(u.a + t * .3) * u.r, -2.1 + y * 2.95, Math.sin(u.a + t * .3) * u.r); });
       // a slow turn for the cells, a tilt that shows the tablet's edge, then a steady view of the glass
-      const tab = Math.max(0, 1 - Math.abs(prog - .62) / .16), end = Math.min(1, Math.max(0, (prog - .74) / .1));
-      group.rotation.x = (.22 + my * .2) * (1 - tab) + (-.72 + my * .15) * tab;
-      const base = (t * .12 + prog * 1.4 + mx * .35) % 6.283;
-      group.rotation.y = (base * (1 - tab) + (.4 + mx * .3 + Math.sin(t * .4) * .25) * tab) * (1 - end) + (mx * .3 + Math.sin(t * .5) * .12) * end;
+      const tab = Math.max(0, 1 - Math.abs(prog - .62) / .16), end = cl01((prog - .74) / .1);
+      group.rotation.x = (.22 + cmy * .2) * (1 - tab) + (-.72 + cmy * .15) * tab;
+      const base = (t * .12 + prog * 1.4 + cmx * .35) % 6.283;
+      group.rotation.y = (base * (1 - tab) + (.4 + cmx * .3 + Math.sin(t * .4) * .25) * tab) * (1 - end) + (cmx * .3 + Math.sin(t * .5) * .12) * end;
+      const gs = (wide ? 1 : Math.min(.62, camera.aspect * .98)) * (.82 + .18 * (1 - gather));
+      group.scale.setScalar(gs);
+      // the camera drifts in slowly and leans a little with the pointer
+      camera.position.set(cmx * .7, -cmy * .45, 17.8 - prog * 1.3); camera.lookAt(0, 0, 0);
       renderer.render(scene, camera);
     };
     requestAnimationFrame(frame);
     story.classList.add("story--gl");
-    return { set: (v) => { prog = v; } };
+    return { set: (v) => { target = v; }, intro: (v) => { introT = v; } };
   };
 
   // CSS fallback bubbles for the story
@@ -611,25 +676,26 @@
   // ----- 01 / the story -----
   if (story) {
     const gl = storyGL();
-    const steps = $$(".story__step", story), stage = $(".story__stage", story);
-    const prog = document.createElement("ol"); prog.className = "story__progress"; prog.setAttribute("aria-hidden", "true");
-    prog.innerHTML = steps.map(() => "<li><i></i></li>").join(""); $(".story__sticky", story).appendChild(prog);
-    const bars = $$("i", prog);
+    const panes = $$(".story__pane", story), stage = $(".story__stage", story), segs = $$(".story__segs b", story), curEl = $(".story__cur", story);
+    // each word of a title rises on its own
+    $$(".story__big", story).forEach((h) => { h.innerHTML = h.textContent.trim().split(/\s+/).map((w, i) => `<span class="wd"><i style="--i:${i}">${w}</i></span>`).join(" "); });
+    story.classList.add("story--live");
     let cur = 0;
     const setStep = (n) => {
       if (n === cur) return; cur = n;
       if (stage) stage.dataset.step = String(n);
-      steps.forEach((s, i) => s.classList.toggle("is-on", i === n));
-      $$(".story__big", story).forEach((s, i) => s.classList.toggle("is-on", i === n));
+      panes.forEach((s, i) => s.classList.toggle("is-on", i === n));
+      if (curEl) curEl.textContent = "0" + (n + 1);
     };
     if (stage) stage.dataset.step = "0";
-    ScrollTrigger.create({ trigger: $(".story__track", story), start: "top top", end: "bottom bottom", scrub: .8,
+    ScrollTrigger.create({ trigger: $(".story__track", story), start: "top top", end: "bottom bottom",
       onUpdate: (s) => {
         const p = s.progress; if (gl) gl.set(p);
         setStep(Math.min(3, Math.floor(p * 4)));
-        bars.forEach((b, i) => gsap.set(b, { scaleY: Math.min(1, Math.max(0, p * 4 - i)) }));
+        segs.forEach((b, i) => { b.style.transform = `scaleX(${Math.min(1, Math.max(0, p * 4 - i))})`; });
       } });
-    gsap.from([".story__swap", ".story__sub"], { yPercent: 60, opacity: 0, duration: 1.1, stagger: .1, ease: "power4.out", scrollTrigger: { trigger: story, start: "top 70%" } });
+    ScrollTrigger.create({ trigger: story, start: "top bottom", end: "top 15%", onUpdate: (s) => { if (gl) gl.intro(s.progress); } });
+    gsap.from([".story__kicker", ".story__foot"], { y: 24, opacity: 0, duration: 1, stagger: .12, ease: "power3.out", scrollTrigger: { trigger: story, start: "top 55%" } });
     if (!gl) {
       const tl = gsap.timeline({ defaults: { ease: "none" }, scrollTrigger: { trigger: $(".story__track", story), start: "top top", end: "bottom bottom", scrub: .6 } });
       tl.fromTo(".story__cell", { scale: .3 }, { scale: 1, duration: 1 }, 0)
@@ -643,12 +709,40 @@
     }
   }
 
+  // ----- 03 and 04: the page stops on each section, squarely in view -----
+  mm.add("(min-width: 961px)", () => {
+    const sts = $$(".hold").map((h) => ScrollTrigger.create({ trigger: h, start: "top bottom", end: "top top",
+      snap: { snapTo: (v, self) => { const d = self && self.direction ? self.direction : scrollDir; return d > 0 ? (v > .25 ? 1 : v) : (v > .82 ? 1 : v); }, duration: { min: .25, max: .7 }, delay: .06, ease: "power2.inOut" } }));
+    return () => sts.forEach((s) => s.kill());
+  });
+
+  // ----- small touches for a mouse: buttons lean towards it, product media tilts -----
+  mm.add("(pointer: fine)", () => {
+    const offs = [];
+    $$(".hero6 .btn, .closer .btn, #products .btn").forEach((b) => {
+      const qx = gsap.quickTo(b, "x", { duration: .5, ease: "power3" }), qy = gsap.quickTo(b, "y", { duration: .5, ease: "power3" });
+      const mv = (e) => { const r = b.getBoundingClientRect(); qx((e.clientX - r.left - r.width / 2) * .22); qy((e.clientY - r.top - r.height / 2) * .32); };
+      const lv = () => { qx(0); qy(0); };
+      b.addEventListener("pointermove", mv); b.addEventListener("pointerleave", lv);
+      offs.push(() => { b.removeEventListener("pointermove", mv); b.removeEventListener("pointerleave", lv); });
+    });
+    $$(".pgal__main").forEach((g) => {
+      gsap.set(g, { transformPerspective: 1100 });
+      const rx = gsap.quickTo(g, "rotationX", { duration: .8, ease: "power3" }), ry = gsap.quickTo(g, "rotationY", { duration: .8, ease: "power3" });
+      const mv = (e) => { const r = g.getBoundingClientRect(); ry(((e.clientX - r.left) / r.width - .5) * 5); rx(((e.clientY - r.top) / r.height - .5) * -4); };
+      const lv = () => { rx(0); ry(0); };
+      g.addEventListener("pointermove", mv); g.addEventListener("pointerleave", lv);
+      offs.push(() => { g.removeEventListener("pointermove", mv); g.removeEventListener("pointerleave", lv); });
+    });
+    return () => offs.forEach((f) => f());
+  });
+
   // ----- headings rise out of a mask -----
   $$("[data-rise]").forEach((h) => {
     if (!h.querySelector(".mask")) h.innerHTML = `<span class="mask"><span>${h.innerHTML}</span></span>`;
     gsap.from($(".mask > span", h), { yPercent: 105, duration: 1.2, ease: "power4.out", scrollTrigger: { trigger: h, start: "top 88%" } });
   });
-  $$(".promises, .steps, .remind__list, .points, .shopgrid, .forms").forEach((g) => {
+  $$(".promises, .steps, .remind__list, .points, .shopgrid, .forms, .trust").forEach((g) => {
     gsap.from(g.children, { y: 40, opacity: 0, duration: .9, stagger: .1, ease: "power3.out", scrollTrigger: { trigger: g, start: "top 86%" } });
   });
 
@@ -657,7 +751,7 @@
     mm.add("(min-width: 960px)", () => {
       wheel.classList.remove("wheel--flat");
       const items = $$(".wheel__item", wheel), texts = $$(".wheel__text", wheel), dots = $$(".wheel__dots button", wheel);
-      const dome = $(".wheel__dome", wheel);
+      const dome = $(".wheel__dome", wheel), count = $(".wheel__count b", wheel);
       const n = items.length, m = texts.length, step = 25;
       let cur = -1, r = 0;
       const layout = () => { r = dome.offsetWidth / 2; };
@@ -668,13 +762,14 @@
         texts.forEach((t, i) => { gsap.killTweensOf(t); if (i !== idx) gsap.set(t, { autoAlpha: 0, y: 0 }); });
         gsap.fromTo(texts[idx], { autoAlpha: 0, y: 26 * dir }, { autoAlpha: 1, y: 0, duration: .5, ease: "power3.out" });
         dots.forEach((d, i) => d.setAttribute("aria-current", String(i === idx)));
+        if (count) count.textContent = "0" + (idx + 1);
       };
       const place = (p) => {
         const f = p * (m - 1);
         items.forEach((it, i) => {
           let d = i - f;
           d = ((d + n / 2) % n + n) % n - n / 2;
-          const a = d * step, sc = 1 - Math.min(Math.abs(d), 2) * .16;
+          const a = d * step, sc = 1.2 - Math.min(Math.abs(d), 1) * .46;   // the one in front is the largest, like the piece you are standing at
           it.style.transform = `rotate(${a}deg) translateY(${-r}px) scale(${sc})`;
           it.style.zIndex = String(100 - Math.round(Math.abs(d) * 10));
           it.style.visibility = Math.abs(d) > 3.4 ? "hidden" : "visible";
@@ -687,8 +782,9 @@
       st = ScrollTrigger.create({ trigger: $(".wheel__track", wheel), start: "top top", end: "bottom bottom", scrub: .8,
         onUpdate: (s) => place(s.progress), onRefresh: () => { layout(); place(st ? st.progress : 0); } });
       place(0);
+      const reveal = gsap.from($$(".wheel__item img", wheel), { scale: 1.5, opacity: 0, duration: 1.3, stagger: .07, ease: "power3.out", scrollTrigger: { trigger: wheel, start: "top 55%" } });
       dots.forEach((d, i) => d.addEventListener("click", () => scrollTo({ top: st.start + (st.end - st.start) * (i / (m - 1)) + 2, behavior: "smooth" })));
-      return () => st.kill();
+      return () => { st.kill(); reveal.kill(); };
     });
     mm.add("(max-width: 959px)", () => { wheel.classList.add("wheel--flat"); });
   }
