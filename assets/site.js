@@ -6,7 +6,10 @@
   const KEY = "nl-cart-" + NL.key;
   const $ = (s, el = document) => el.querySelector(s);
   const $$ = (s, el = document) => [...el.querySelectorAll(s)];
-  const money = (n) => NL.sym + (Math.round(n * 100) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/\.00$/, "");
+  const money = (n) => {
+    const s = (Math.round(n * 100) / 100).toLocaleString(NL.loc || "en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/[.,]00$/, "");
+    return NL.suf ? s + NL.suf : NL.sym + s;   // German: 39 €
+  };
 
   // ?review highlights everything Noble Life still has to confirm
   if (/[?&]review\b/.test(location.search)) document.body.classList.add("review");

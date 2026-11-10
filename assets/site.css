@@ -1133,3 +1133,12 @@ html[lang="zh-Hant"] .story__pane .story__big { font-size: min(3.3vw, 6.4svh); t
 html { overflow-x: clip; }
 [dir="rtl"] .skip { left: auto; right: -999px; }
 [dir="rtl"] .skip:focus { left: auto; right: 16px; }
+
+/* =====================================================================
+   v14: German: long compound words, so headlines sit smaller and may hyphenate
+   ===================================================================== */
+html[lang="de"] .hero6 h1 { font-size: clamp(2.4rem, 1.1rem + 3.8vw, 4.9rem); }
+html[lang="de"] .story__pane .story__big { font-size: min(4vw, 7.4svh); }
+html[lang="de"] .nav { gap: 22px; }
+html[lang="de"] #products h2.h-line { font-size: min(clamp(1.8rem, 1rem + 2.4vw, 3.4rem), 6svh); }
+html[lang="de"] h1, html[lang="de"] h2, html[lang="de"] h3 { hyphens: auto; overflow-wrap: break-word; }
