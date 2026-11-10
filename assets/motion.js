@@ -8,6 +8,7 @@
   const ease = "cubic-bezier(.2,.7,.1,1)";
   const hasGsap = !!(window.gsap && window.ScrollTrigger) && !reduce;
   const R = Math.random;
+  const rtl = document.documentElement.dir === "rtl";   // Arabic: the layout mirrors
 
   // ----- header -----
   const header = $(".header, .lp-head");
@@ -405,9 +406,9 @@
 
     // backdrop: deep water with a pool of light behind the subject and slow shafts from above
     const bgMat = new THREE.ShaderMaterial({ depthTest: false, depthWrite: false,
-      uniforms: { uT: { value: 0 }, uP: { value: 0 }, uA: { value: 1 }, uC: { value: new THREE.Vector2(.7, .5) } },
+      uniforms: { uT: { value: 0 }, uP: { value: 0 }, uA: { value: 1 }, uC: { value: new THREE.Vector2(.7, .5) }, uFlip: { value: rtl ? 1 : 0 } },
       vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = vec4(position.xy, 0.0, 1.0); }`,
-      fragmentShader: `varying vec2 vUv; uniform float uT; uniform float uP; uniform float uA; uniform vec2 uC;
+      fragmentShader: `varying vec2 vUv; uniform float uT; uniform float uP; uniform float uA; uniform vec2 uC; uniform float uFlip;
         float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898,78.233))) * 43758.5453); }
         void main(){ vec2 uv = vUv;
           vec3 c = mix(vec3(.035,.115,.075), vec3(.06,.185,.12), smoothstep(0.0, 1.0, uv.y));
@@ -418,7 +419,7 @@
           c += pool * exp(-dot(q,q) * 2.6) * (.62 + .08 * sin(uT * .6));
           float a = uv.x * 5.0 - uv.y * 1.3;
           float rays = (sin(a + uT * .22) * .5 + .5) * (sin(a * 2.7 - uT * .15 + 1.3) * .5 + .5);
-          c += vec3(.07,.2,.15) * pow(rays, 2.2) * smoothstep(0.0, 1.0, uv.y) * (.22 + .78 * water) * mix(.3, 1.0, smoothstep(.25, .7, uv.x));
+          c += vec3(.07,.2,.15) * pow(rays, 2.2) * smoothstep(0.0, 1.0, uv.y) * (.22 + .78 * water) * mix(.3, 1.0, smoothstep(.25, .7, mix(uv.x, 1.0 - uv.x, uFlip)));
           c *= mix(.6, 1.0, smoothstep(1.15, .3, length((uv - .5) * vec2(1.2, 1.0))));
           c += (hash(uv * 900.0 + fract(uT)) - .5) * .014;
           gl_FragColor = vec4(c, 1.0); }` });
@@ -547,8 +548,8 @@
       const w = host.clientWidth, h = host.clientHeight; if (!w || !h) return;
       renderer.setPixelRatio(1); renderer.setSize(Math.round(w * PR), Math.round(h * PR), false); camera.aspect = w / h; camera.updateProjectionMatrix();
       wide = w >= 960;
-      group.position.x = wide ? 3.7 : 0; group.position.y = wide ? .25 : -1.25;
-      bgMat.uniforms.uA.value = w / h; bgMat.uniforms.uC.value.set(wide ? .71 : .5, wide ? .53 : .42);
+      group.position.x = wide ? (rtl ? -3.7 : 3.7) : 0; group.position.y = wide ? .25 : -1.25;
+      bgMat.uniforms.uA.value = w / h; bgMat.uniforms.uC.value.set(wide ? (rtl ? .29 : .71) : .5, wide ? .53 : .42);
     };
     size(); addEventListener("resize", size);
     if ("ResizeObserver" in window) new ResizeObserver(size).observe(host);
@@ -701,9 +702,9 @@
     mm.add("(min-width: 960px)", () => {
       tlx.classList.remove("tl--flat");
       const row = $(".tl__row", tlx);
-      const tw = gsap.to(row, { x: () => -(row.scrollWidth - innerWidth + 80), ease: "none",
+      const tw = gsap.to(row, { x: () => (rtl ? 1 : -1) * (row.scrollWidth - innerWidth + 80), ease: "none",
         scrollTrigger: { trigger: $(".tl__track", tlx), start: "top top", end: "bottom bottom", scrub: .6, invalidateOnRefresh: true } });
-      $$(".tl__year", tlx).forEach((y) => gsap.from(y, { yPercent: 40, opacity: 0, ease: "none", scrollTrigger: { trigger: y, containerAnimation: tw, start: "left 90%", end: "left 55%", scrub: true } }));
+      if (!rtl) $$(".tl__year", tlx).forEach((y) => gsap.from(y, { yPercent: 40, opacity: 0, ease: "none", scrollTrigger: { trigger: y, containerAnimation: tw, start: "left 90%", end: "left 55%", scrub: true } }));
       return () => tw.kill();
     });
     mm.add("(max-width: 959px)", () => { tlx.classList.add("tl--flat"); });
@@ -785,14 +786,14 @@
   if (gal) {
     mm.add("(min-width: 961px)", () => {
       const row = $(".gal__row", gal), cards = $$(".gal__card", gal), count = $(".gal__count b", gal), line = $(".gal__line i", gal);
-      const tw = gsap.to(row, { x: () => -Math.max(0, row.scrollWidth - innerWidth), ease: "none",
+      const tw = gsap.to(row, { x: () => (rtl ? 1 : -1) * Math.max(0, row.scrollWidth - innerWidth), ease: "none",
         scrollTrigger: { trigger: $(".gal__track", gal), start: "top top", end: "bottom bottom", scrub: .7, invalidateOnRefresh: true,
           onUpdate: (s) => {
             count.textContent = "0" + (Math.min(cards.length - 1, Math.round(s.progress * (cards.length - 1))) + 1);
             line.style.transform = `scaleX(${.25 + .75 * s.progress})`;
           } } });
       // each photo drifts a little inside its frame as it crosses the screen
-      const par = $$(".gal__img img", gal).map((im) => gsap.fromTo(im, { xPercent: -4 }, { xPercent: 4, ease: "none",
+      const par = (rtl ? [] : $$(".gal__img img", gal)).map((im) => gsap.fromTo(im, { xPercent: -4 }, { xPercent: 4, ease: "none",
         scrollTrigger: { trigger: im.parentElement, containerAnimation: tw, start: "left right", end: "right left", scrub: true } }));
       const rev = gsap.from(cards, { y: 90, opacity: 0, duration: 1.1, stagger: .1, ease: "power3.out", scrollTrigger: { trigger: gal, start: "top 60%" } });
       return () => { par.forEach((p) => p.kill()); rev.kill(); tw.kill(); };

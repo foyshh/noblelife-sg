@@ -1064,3 +1064,72 @@ h1 em, h2 em, h3 em, .it, .scene figcaption em { font-family: inherit; font-styl
   .explain__img { width: 100%; border-radius: 18px; aspect-ratio: 4 / 3; }
 }
 .gal__sticky > .wrap { width: 100%; }
+
+/* ---------- v13: country and language switcher ---------- */
+.loc { position: relative; }
+.loc__btn { display: inline-flex; align-items: center; gap: 6px; height: 48px; padding: 0 12px; border: 0; border-radius: 6px; background: none; font: 500 var(--t-meta)/1 var(--sans); color: var(--ink); cursor: pointer; }
+.loc__btn svg { width: 18px; height: 18px; }
+.loc__sep { color: var(--ink-3); }
+.loc__panel { position: absolute; right: 0; top: calc(100% + 10px); z-index: 50; width: 340px; display: grid; grid-template-columns: 1.3fr 1fr; gap: 18px; padding: 18px 20px; background: #fff; border-radius: 10px; box-shadow: 0 30px 60px -20px rgba(20,20,20,.25), 0 0 0 1px var(--rule); opacity: 0; visibility: hidden; transform: translateY(8px); transition: opacity .25s, transform .35s var(--ease), visibility 0s .35s; }
+.loc.is-open .loc__panel { opacity: 1; visibility: visible; transform: none; transition: opacity .25s, transform .35s var(--ease); }
+.loc__panel ul { list-style: none; margin: 8px 0 0; padding: 0; }
+.loc__panel a { display: flex; justify-content: space-between; gap: 10px; padding: 9px 0; border-top: 1px solid var(--rule); text-decoration: none; font-size: .95rem; }
+.loc__panel a span:last-child:not(:first-child) { color: var(--ink-3); font-size: var(--t-meta); }
+.loc__panel a[aria-current="true"] { font-weight: 600; }
+.loc__panel a:hover span:first-child { text-decoration: underline; text-underline-offset: 4px; }
+@media (max-width: 960px) { .loc__panel { position: fixed; left: 10px; right: 10px; top: 70px; width: auto; } .loc__btn { padding: 0 8px; } }
+
+/* =====================================================================
+   v13: each language gets type that suits it
+   ===================================================================== */
+/* Filipino: longer words, so headlines sit a little smaller */
+html[lang="fil"] .hero6 h1 { font-size: clamp(2.4rem, 1.1rem + 3.8vw, 4.9rem); }
+html[lang="fil"] .story__pane .story__big { font-size: min(4vw, 7.4svh); }
+html[lang="fil"] .nav { gap: 22px; }
+html[lang="fil"] #products h2.h-line { font-size: min(clamp(1.8rem, 1rem + 2.4vw, 3.4rem), 6svh); }
+
+/* Arabic: its own typeface, no tightened letters, right to left */
+html[lang="ar"] { --sans: "IBM Plex Sans Arabic", "Segoe UI", Tahoma, sans-serif; --display: "IBM Plex Sans Arabic", "Segoe UI", Tahoma, sans-serif; }
+html[lang="ar"] * { letter-spacing: 0 !important; word-spacing: 0 !important; }
+html[lang="ar"] h1, html[lang="ar"] h2, html[lang="ar"] h3 { line-height: 1.3; font-weight: 500; }
+html[lang="ar"] .hero6 h1 { font-size: clamp(2.4rem, 1.1rem + 3.8vw, 4.8rem); line-height: 1.25; }
+html[lang="ar"] .story__pane .story__big { font-size: min(4vw, 7.2svh); line-height: 1.35; }
+html[lang="ar"] .pagehead h1, html[lang="ar"] .story-hero h1 { line-height: 1.2; }
+[dir="rtl"] .arrow { scale: -1 1; }
+[dir="rtl"] .story__copy { left: auto; right: var(--gutter); }
+[dir="rtl"] .story__segs b, [dir="rtl"] .gal__line i { transform-origin: right; }
+[dir="rtl"] .hero6__media::after { background: linear-gradient(270deg, rgba(248,249,245,.94) 0%, rgba(248,249,245,.78) 30%, rgba(248,249,245,0) 62%); }
+[dir="rtl"] .hero6__video { transform: scaleX(-1); }
+[dir="rtl"] .hero6::after { right: auto; left: var(--gutter); }
+[dir="rtl"] .hero6__range a { padding: 18px 0 22px 18px; }
+[dir="rtl"] .hero6__range a + a { padding-right: 18px; border-left: 0; border-right: 1px solid var(--rule); }
+[dir="rtl"] .promise { padding: 26px 0 6px 30px; }
+[dir="rtl"] .promise + .promise { padding-left: 30px; padding-right: 30px; border-left: 0; border-right: 1px solid var(--rule); }
+[dir="rtl"] .steps li { padding: 26px 0 0 30px; }
+[dir="rtl"] .steps li + li { padding-right: 30px; border-left: 0; border-right: 1px solid var(--rule); }
+[dir="rtl"] .qa--2 .qa__item, [dir="rtl"] .qa--2 .qa__item + .qa__item { padding: 22px 0 6px 24px; }
+[dir="rtl"] .qa--2 .qa__item:nth-child(even) { padding-right: 24px; border-left: 0; border-right: 1px solid var(--rule); }
+[dir="rtl"] .loc__panel { right: auto; left: 0; }
+[dir="rtl"] #products .pgal__thumbs { right: auto; left: 12px; }
+[dir="rtl"] .closer__img { right: auto; left: 4vw; }
+[dir="rtl"] .wa-float { right: auto; left: 14px; }
+[dir="rtl"] .msg time { right: auto; left: 10px; }
+[dir="rtl"] .points .ans p { padding: 0 52px 22px 0; }
+@media (max-width: 960px) {
+  [dir="rtl"] .hero6__media::after { background: linear-gradient(0deg, #F8F9F5 0%, rgba(248,249,245,0) 30%); }
+  [dir="rtl"] .promise + .promise, [dir="rtl"] .steps li + li { border-right: 0; padding-right: 0; }
+}
+
+/* Chinese: its own typeface, open letters, taller lines */
+html[lang="zh-Hant"] { --sans: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif; --display: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif; }
+html[lang="zh-Hant"] * { letter-spacing: 0 !important; }
+html[lang="zh-Hant"] body { line-height: 1.75; }
+html[lang="zh-Hant"] h1, html[lang="zh-Hant"] h2, html[lang="zh-Hant"] h3 { line-height: 1.3; font-weight: 500; }
+html[lang="zh-Hant"] .hero6 h1 { font-size: clamp(2.4rem, 1.1rem + 3.8vw, 4.8rem); line-height: 1.25; }
+html[lang="zh-Hant"] .story__pane .story__big { font-size: min(4vw, 7.2svh); line-height: 1.3; }
+html[lang="zh-Hant"] .pagehead h1, html[lang="zh-Hant"] .story-hero h1 { line-height: 1.2; }
+html[lang="zh-Hant"] .story__pane .story__big { font-size: min(3.3vw, 6.4svh); text-wrap: wrap; }
+@media (max-width: 960px) { html[lang="zh-Hant"] .story__pane .story__big { font-size: min(7.2vw, 5svh); } }
+html { overflow-x: clip; }
+[dir="rtl"] .skip { left: auto; right: -999px; }
+[dir="rtl"] .skip:focus { left: auto; right: 16px; }

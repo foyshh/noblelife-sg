@@ -1,10 +1,12 @@
 // Noble Life SG prototype: cart drawer, quantity picker, sticky buy bar, Meta events.
 // In WooCommerce this becomes the store's own cart; the event names stay the same.
 (function () {
-  const KEY = "nl-cart";
+  const NL = window.NL || { sym: "S$", code: "SGD", key: "sg-en", t: {} };
+  const T = (k, d) => (NL.t && NL.t[k]) || d;
+  const KEY = "nl-cart-" + NL.key;
   const $ = (s, el = document) => el.querySelector(s);
   const $$ = (s, el = document) => [...el.querySelectorAll(s)];
-  const money = (n) => "S$" + (Math.round(n * 100) / 100).toFixed(2).replace(/\.00$/, "");
+  const money = (n) => NL.sym + (Math.round(n * 100) / 100).toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 }).replace(/\.00$/, "");
 
   // ?review highlights everything Noble Life still has to confirm
   if (/[?&]review\b/.test(location.search)) document.body.classList.add("review");
@@ -23,7 +25,7 @@
     const found = cart.find((l) => l.id === item.id);
     if (found) found.qty += qty; else cart.push({ ...item, qty });
     save(cart); render();
-    track("AddToCart", { content_ids: [item.id], content_type: "product", value: item.price * qty, currency: "SGD" });
+    track("AddToCart", { content_ids: [item.id], content_type: "product", value: item.price * qty, currency: NL.code });
   }
 
   function render() {
@@ -34,15 +36,15 @@
     box.innerHTML = cart.length ? cart.map((l, i) => `
         <div class="line">
           <img src="${l.img}" alt="">
-          <div><b>${l.name}</b><span class="small">${money(l.price)} a box</span>
+          <div><b>${l.name}</b><span class="small">${money(l.price)} ${T("perBox", "a box")}</span>
             <div class="stepper">
-              <button type="button" data-step="-1" data-i="${i}" aria-label="One less ${l.name}">&minus;</button>
+              <button type="button" data-step="-1" data-i="${i}" aria-label="${T("less", "One less")} ${l.name}">&minus;</button>
               <span aria-live="polite">${l.qty}</span>
-              <button type="button" data-step="1" data-i="${i}" aria-label="One more ${l.name}">+</button>
+              <button type="button" data-step="1" data-i="${i}" aria-label="${T("more", "One more")} ${l.name}">+</button>
             </div></div>
           <b>${money(l.price * l.qty)}</b>
         </div>`).join("")
-      : '<p class="empty">Your cart is empty. Crypto Coffee (S$25) is an easy place to start.</p>';
+      : `<p class="empty">${T("empty", "Your cart is empty. Crypto Coffee (S$25) is an easy place to start.")}</p>`;
     const t = $("#cart-total"); if (t) t.textContent = money(cart.reduce((s, l) => s + l.qty * l.price, 0));
   }
 
@@ -91,10 +93,12 @@
     if (wa) { track("Contact", { method: "whatsapp", where: wa.dataset.wa }); return; }
     if (e.target.closest("[data-checkout]")) {
       e.preventDefault();
-      track("InitiateCheckout", { value: cart.reduce((s, l) => s + l.qty * l.price, 0), currency: "SGD" });
-      toast("Prototype: checkout opens in WooCommerce");
+      track("InitiateCheckout", { value: cart.reduce((s, l) => s + l.qty * l.price, 0), currency: NL.code });
+      toast(T("checkout", "Prototype: checkout opens in WooCommerce"));
       return;
     }
+    const lb = e.target.closest(".loc__btn"), loc = $(".loc");
+    if (loc) { const open = lb ? !loc.classList.contains("is-open") : (e.target.closest(".loc__panel") ? true : false); loc.classList.toggle("is-open", open); $(".loc__btn", loc).setAttribute("aria-expanded", String(open)); }
     const m = e.target.closest(".menu-btn");
     if (m) { const open = $(".nav").classList.toggle("is-open"); m.setAttribute("aria-expanded", String(open)); }
   });
@@ -132,13 +136,13 @@
     document.addEventListener("click", (e) => {
       if (!e.target.closest("[data-checkout]")) return;
       if (boxes.some((b) => b.checked)) {
-        if (tel.value.replace(/\D/g, "").length < 8) { e.preventDefault(); e.stopImmediatePropagation(); tel.focus(); toast("Add your WhatsApp number for the reminders, or untick them"); }
+        if (tel.value.replace(/\D/g, "").length < 8) { e.preventDefault(); e.stopImmediatePropagation(); tel.focus(); toast(T("needNumber", "Add your WhatsApp number for the reminders, or untick them")); }
       }
     }, true);
   }
 
   const pid = document.body.dataset.product;
-  if (pid) track("ViewContent", { content_ids: [pid], content_type: "product", currency: "SGD", value: Number(document.body.dataset.price || 0) });
+  if (pid) track("ViewContent", { content_ids: [pid], content_type: "product", currency: NL.code, value: Number(document.body.dataset.price || 0) });
 
   render();
 })();
