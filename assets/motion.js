@@ -851,6 +851,100 @@
       onEnter: () => gsap.to(chat, { autoAlpha: 1, y: 0, scale: 1, duration: .5, stagger: .7, ease: "back.out(1.7)" }) });
   }
 
+  // ----- the band: its words slide along the curve and the band draws itself -----
+  const bandText = $(".band6 textPath"), bandBg = $(".band6__bg");
+  if (bandText) {
+    gsap.fromTo(bandText, { attr: { startOffset: "-45%" } }, { attr: { startOffset: "0%" }, ease: "none",
+      scrollTrigger: { trigger: ".take", start: "top bottom", end: "bottom top", scrub: true } });
+    gsap.fromTo(bandBg, { strokeDashoffset: 1 }, { strokeDashoffset: 0, ease: "power2.out",
+      scrollTrigger: { trigger: ".band6", start: "top 98%", end: "top 45%", scrub: true } });
+  }
+
+  // ----- tilted frames: they rise in, drift at their own pace, and play only while seen -----
+  $$(".tilt").forEach((f, i) => {
+    gsap.from(f, { y: 90, scale: .92, opacity: 0, duration: 1.1, delay: i * .09, ease: "power3.out", scrollTrigger: { trigger: ".take__stack", start: "top 82%" } });
+    gsap.to(f, { yPercent: i % 2 ? -9 : 7, ease: "none", scrollTrigger: { trigger: ".take", start: "top bottom", end: "bottom top", scrub: true } });
+  });
+  if ("IntersectionObserver" in window) {
+    const io = new IntersectionObserver((es) => es.forEach((e) => { if (e.isIntersecting) e.target.play().catch(() => {}); else e.target.pause(); }), { threshold: .25 });
+    $$(".tilt video").forEach((v) => io.observe(v));
+  }
+
+  // ----- the range: a box travels down a line that draws itself, a card arrives at each stop (laptops only) -----
+  const rngEl = $("#range.rng");
+  if (rngEl) {
+    mm.add("(min-width: 961px)", () => {
+      rngEl.classList.add("rng--live");
+      const track = $(".rng__track", rngEl), svg = $(".rng__lines", rngEl);
+      const line = $("#rng-line", rngEl), arc = $(".rng__arc", rngEl);
+      const boxes = $(".rng__boxes", rngEl), imgs = $$(".rng__box", rngEl);
+      const cards = $$(".rng__card", rngEl), facts = $$(".rng__fact", rngEl), head = $(".rng__head", rngEl);
+      const L = line.getTotalLength(), AL = arc.getTotalLength();
+      // the line is four curves; the box rests where each one ends
+      const d = line.getAttribute("d"), first = d.match(/^M[^C]+/)[0], legs = d.match(/C[^C]+/g);
+      const knots = [1, 2, 3, 4].map((n) => {
+        const p = document.createElementNS("http://www.w3.org/2000/svg", "path");
+        p.setAttribute("d", first + legs.slice(0, n).join("")); svg.appendChild(p);
+        const len = p.getTotalLength(); svg.removeChild(p); return len / L;
+      });
+      const K = [0, ...knots];                       // 0, then stops 1 to 4
+      const ROT = [0, -9, 7, -6, 9];
+      const SEG = [["hold", .6], ["move", 1], ["hold", .9], ["move", 1], ["hold", .9], ["move", 1], ["hold", .9], ["move", 1], ["hold", 1.2]];
+      let t0 = 0; const S = SEG.map(([k, dur], n) => { const o = { k, dur, a: t0, b: t0 + dur, n }; t0 += dur; return o; }); const T = t0;
+      const c01 = (x) => Math.max(0, Math.min(1, x));
+      const sm = (a, b, x) => { const t = c01((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+      const eio = (x) => (x < .5 ? 2 * x * x : 1 - Math.pow(-2 * x + 2, 2) / 2);
+      const prodAt = (stop) => Math.min(3, Math.max(0, stop - 1));
+      let on = -1;
+      const render = (u) => {
+        const w = innerWidth, h = innerHeight, sc = Math.max(w / 1440, h / 900), ox = (w - 1440 * sc) / 2, oy = (h - 900 * sc) / 2;
+        const X = (x) => (rtl ? w - (x * sc + ox) : x * sc + ox), Y = (y) => y * sc + oy;
+        const seg = S.find((s) => u <= s.b) || S[S.length - 1], x = c01((u - seg.a) / seg.dur);
+        let tp, rot, prod, sx = 1, sz = 1;
+        if (seg.k === "hold") { const i = seg.n / 2; tp = K[i]; rot = ROT[i]; prod = prodAt(i); }
+        else {
+          const m = (seg.n + 1) / 2, tt = eio(x), from = prodAt(m - 1), to = prodAt(m);
+          tp = K[m - 1] + (K[m] - K[m - 1]) * tt;
+          rot = ROT[m - 1] + (ROT[m] - ROT[m - 1]) * tt + Math.sin(tt * Math.PI) * 8 * (m % 2 ? 1 : -1);
+          prod = tt < .5 ? from : to;
+          if (from !== to) sx = Math.max(.06, Math.abs(Math.cos(Math.PI * tt)));
+          sz = 1 - .1 * Math.sin(tt * Math.PI);
+        }
+        const pt = line.getPointAtLength(tp * L);
+        boxes.style.transform = `translate(${X(pt.x)}px, ${Y(pt.y)}px) rotate(${rot}deg) scale(${sx * sz}, ${sz})`;
+        if (prod !== on) { on = prod; imgs.forEach((im, j) => im.classList.toggle("is-on", j === prod)); }
+        line.style.strokeDashoffset = 1 - tp;
+        // frame one: the facts on their curve and the title fade away as the box leaves
+        const f0 = 1 - sm(.3, 1.1, u);
+        arc.style.opacity = f0;
+        facts.forEach((el, j) => {
+          const q = arc.getPointAtLength(AL * [.2, .5, .8][j]);
+          el.style.transform = `translate(${X(q.x) - el.offsetWidth / 2}px, ${Y(q.y) - el.offsetHeight / 2 - (1 - f0) * 50}px)`; el.style.opacity = f0;
+        });
+        head.style.opacity = f0; head.style.transform = `translateY(${-(1 - f0) * 40}px)`; head.style.pointerEvents = f0 > .5 ? "auto" : "none";
+        // one card per stop: it rises in as the box arrives and sinks away as it leaves
+        cards.forEach((c, i) => {
+          const hold = S[2 * (i + 1)], inn = S[2 * (i + 1) - 1], out = S[2 * (i + 1) + 1];   // the last card stays
+          const a = sm(inn.a + .6 * inn.dur, hold.a + .3 * hold.dur, u), b = out ? sm(hold.b - .15 * hold.dur, out.a + .35 * out.dur, u) : 0;
+          const al = a * (1 - b);
+          c.style.opacity = al;
+          c.style.transform = `translateY(calc(-50% + ${(1 - a) * 90 - b * 60}px)) rotate(${(i % 2 ? 2.2 : -2.2) * (1 - a) * (rtl ? -1 : 1)}deg)`;
+          c.classList.toggle("is-live", al > .7);
+        });
+      };
+      // rest the page on each stop, squarely in view
+      const mid = (s) => (s.a + s.b) / 2 / T;
+      const stops = [0, mid(S[2]), mid(S[4]), mid(S[6]), mid(S[8]), 1];
+      const st = ScrollTrigger.create({ trigger: track, start: "top top", end: "bottom bottom", onUpdate: (s) => render(s.progress * T), onRefresh: (s) => render(s.progress * T),
+        snap: { snapTo: stops, duration: { min: .25, max: .7 }, delay: .1, ease: "power2.inOut" } });
+      render(0);
+      return () => { st.kill(); rngEl.classList.remove("rng--live"); [boxes, head, ...facts, ...cards].forEach((el) => { el.style.transform = ""; el.style.opacity = ""; }); };
+    });
+  }
+
+  // ----- payments rise in along their curve -----
+  if ($(".pays__arc")) gsap.from(".pay", { y: 70, opacity: 0, duration: 1, stagger: .09, ease: "power3.out", scrollTrigger: { trigger: ".pays__arc", start: "top 90%" } });
+
   // ----- closing circle turns slowly -----
   if ($(".closer__img")) gsap.fromTo(".closer__img img", { rotate: -8, scale: 1.1 }, { rotate: 8, scale: 1, ease: "none", scrollTrigger: { trigger: ".closer", start: "top bottom", end: "bottom top", scrub: true } });
 
